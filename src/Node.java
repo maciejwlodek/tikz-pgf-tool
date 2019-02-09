@@ -10,7 +10,7 @@ public class Node extends Circle {
     static IntegerProperty nodeRadiusProperty = new SimpleIntegerProperty(10);
     static DoubleProperty widthProperty = new SimpleDoubleProperty(1.0);
     static ObjectProperty<Color> strokeColorProperty = new SimpleObjectProperty<>(Color.BLACK);
-    static ObjectProperty<Color> fillColorProperty = new SimpleObjectProperty<>(Color.TRANSPARENT);
+    static ObjectProperty<Color> fillColorProperty = new SimpleObjectProperty<>(Color.WHITE);
 
     public Node(int centerX, int centerY, Graph graph) {
         super(centerX, centerY, getNodeRadius());
@@ -20,6 +20,8 @@ public class Node extends Circle {
         this.strokeProperty().bind(strokeColorProperty);
         this.radiusProperty().bind(nodeRadiusProperty);
         this.strokeWidthProperty().bind(widthProperty);
+
+        toFront();
 
 //        setFill(fillColor);
 //        setStroke(strokeColor);
@@ -33,12 +35,12 @@ public class Node extends Circle {
     }
 
     public double getRescaledX() {
-        double width = 620; //TODO: fix
+        double width = 620; //TODO: fix by binding to actual width
         double targetRange = 5; //target range is [-5,5]
         return (getCenterX() - width/2) * (2 * targetRange / width);
     }
     public double getRescaledY() {
-        double height = 620; //TODO: fix
+        double height = 620; //TODO: fix by binding to actual width
         double targetRange = 5; //target range is [-5,5]
         return (height/2 - getCenterY()) * (2 * targetRange / height);
     }

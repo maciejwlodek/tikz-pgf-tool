@@ -4,10 +4,8 @@ import javafx.beans.binding.Bindings;
 import javafx.beans.binding.BooleanBinding;
 import javafx.beans.property.BooleanProperty;
 import javafx.beans.property.SimpleBooleanProperty;
-import javafx.collections.FXCollections;
-import javafx.collections.ListChangeListener;
-import javafx.collections.ObservableList;
 import javafx.geometry.Insets;
+import javafx.geometry.Point2D;
 import javafx.scene.Cursor;
 import javafx.scene.Group;
 import javafx.scene.Scene;
@@ -27,16 +25,17 @@ import javafx.util.Pair;
 import java.awt.*;
 import java.awt.datatransfer.Clipboard;
 import java.awt.datatransfer.StringSelection;
+import java.util.ArrayList;
 import java.util.Optional;
 
 public class Main extends Application {
 
     /*
     Summary of TODOS
-    TODO: Fix rescaling of coordinates
-    TODO: Allow deletion of nodes by drawing reverse arrow
     TODO: Implement directed vs undirected
     TODO: Allow editing of labels and label positions
+    TODO: Allow editing of node shapes (circle, rectangle, etc).
+    TODO: Snap to grid option
      */
 
 
@@ -47,15 +46,20 @@ public class Main extends Application {
     Button editEdgeShapeButton;
     BooleanProperty addingNodeProperty = new SimpleBooleanProperty(false);
     double threshold = 50;
+    double edgeThreshold = 30;
     Circle followingNode;
     Node selectedNode;
+    BezierEdge selectedEdge;
     Text text = new Text("");
     //Text helpText = new Text("Press the Add Node \n button to add vertices \n to the graph. \n Right click to \n finish adding nodes. \n Left click drag \n a node to move \n it around, and \n right click drag \n from one node \n to another to create \n an edge between them.");
     Button helpButton = new Button("Help");
 
     Graph graph = new Graph();
-    Edge tempEdge;
+    BezierEdge tempEdge;
 
+    Point2D tempPoint = new Point2D(-1,-1);
+
+//    include in preamble:
 //    \\usepackage{tikz}
 //      \\usepackage{pgfmath}
 //      \\usetikzlibrary{arrows}
@@ -110,7 +114,17 @@ public class Main extends Application {
         });
         helpButton.setOnAction(e -> {
             Alert alert = new Alert(Alert.AlertType.INFORMATION);
-            alert.setContentText("Press the Add Node button to add vertices to the graph. Right click to finish adding nodes. Left click and drag a node to move it around, and right click and drag from one node to another to create an edge between them. Redraw an edge to remove it from the graph. Once your graph is finished, press the Generate Latex button to copy the tikz code into your clipboard.");
+            alert.setContentText("Press the Add Node button to add vertices to the graph. " +
+                    "Right click to finish adding nodes. Left click and drag a node to move it around, " +
+                    "and right click and drag from one node to another to create an edge between them. " +
+                    "Click on any edge and move the two green circles (representing the Bezier control points) " +
+                    "to curve the edge. Double click an edge or node to remove it from the graph. " +
+                    "Once your graph is finished, press the Generate Latex button to copy the tikz code " +
+                    "into your clipboard. Note: please include the following in your preamble: \n" +
+                    "\\usepackage{tikz}\n" +
+                    "\\usepackage{pgfmath}\n" +
+                    "\\usetikzlibrary{arrows}\n" +
+                    "\\usetikzlibrary{shapes}");
             alert.showAndWait();
             //System.out.println("Press the Add Node button to add vertices to the graph. Right click to finish adding nodes. \nLeft click drag a node to move it around, and right click drag from one node to another to create an edge between them. \nOnce your graph is finished, press the Generate Latex button to copy the tikz code into your clipboard.");
         });
@@ -133,12 +147,49 @@ public class Main extends Application {
             String s = String.format("x = %3.0f, y = %3.0f", e.getX(), e.getY());
             text.setText(s);
         });
-        pane.setOnMouseClicked(e -> {
+        pane.setOnMousePressed(e -> {
             if(e.getButton().equals(MouseButton.PRIMARY)) {
                 if(addingNodeProperty.get()) {
                     int centerX = (int) e.getX();
                     int centerY = (int) e.getY();
                     addNode(centerX, centerY);
+                }
+                else {
+                    Point2D clickPoint = new Point2D(e.getX(), e.getY());
+                    boolean notClickedOnNode = true;
+                    for (javafx.scene.Node node : group.getChildren()) {
+                        if ((node instanceof Node || node instanceof BezierControlNode) && node.contains(clickPoint)) {
+                            notClickedOnNode = false;
+                        }
+                    }
+
+                    if (notClickedOnNode) {
+                        Optional<Pair<BezierEdge, Double>> closestEdge = graph.nearestEdge(clickPoint);
+                        if (closestEdge.isPresent()) {
+                            double dist = closestEdge.get().getValue();
+                            if (dist >= edgeThreshold) {
+                                if (selectedEdge != null) {
+                                    group.getChildren().remove(selectedEdge.control1);
+                                    group.getChildren().remove(selectedEdge.control2);
+                                    selectedEdge = null;
+                                }
+                            } else {
+                                BezierEdge edge = closestEdge.get().getKey();
+                                if (selectedEdge != null) {
+                                    group.getChildren().removeAll(selectedEdge.control1, selectedEdge.control2);
+                                }
+                                selectedEdge = edge;
+                                group.getChildren().addAll(selectedEdge.control1, selectedEdge.control2);
+
+                            }
+                        }
+                    }
+//                        if(!group.contains(new Point2D(e.getX(), e.getY()))) {
+//                            group.getChildren().remove(selectedEdge.control1);
+//                            group.getChildren().remove(selectedEdge.control2);
+//                            selectedEdge = null;
+//                        }
+
                 }
             }
             else {
@@ -158,6 +209,14 @@ public class Main extends Application {
             if(e.getButton().equals(MouseButton.SECONDARY) && tempEdge != null) {
                 tempEdge.setEndX(e.getX());
                 tempEdge.setEndY(e.getY());
+                double dist = Math.hypot(tempEdge.getEndX() - tempEdge.getStartX(), tempEdge.getStartY() - tempEdge.getEndY());
+                if(dist>3*Node.getNodeRadius() && !group.getChildren().contains(tempEdge)) group.getChildren().add(tempEdge);
+                else if (dist<=3*Node.getNodeRadius()) group.getChildren().remove(tempEdge);
+                int[] linearControls = BezierEdge.computeLinearControls(tempEdge.getStartX(), e.getX(), tempEdge.getStartY(), e.getY());
+                tempEdge.setControlX1(linearControls[0]);
+                tempEdge.setControlY1(linearControls[1]);
+                tempEdge.setControlX2(linearControls[2]);
+                tempEdge.setControlY2(linearControls[3]);
             }
         });
 
@@ -169,8 +228,33 @@ public class Main extends Application {
         primaryStage.show();
     }
 
-    public void addEdge(Edge e) {
+    public void addEdge(Node startingNode, Node endingNode) {
+        BezierEdge edge = new BezierEdge(startingNode, endingNode, graph);
+        edge.toBack();
+        if(graph.getEdges().contains(edge)) {
+            graph.getEdges().remove(edge);
+            group.getChildren().remove(edge);
+        }
+        else {
+            group.getChildren().add(edge);
+            graph.add(edge);
+            edge.setOnMouseClicked(e -> {
+                if(e.getClickCount()==1) {
+//                    if (selectedEdge != null) {
+//                        group.getChildren().removeAll(selectedEdge.control1, selectedEdge.control2);
+//                    }
+//                    selectedEdge = edge;
+//                    group.getChildren().addAll(selectedEdge.control1, selectedEdge.control2);
+                }
+                else if(e.getClickCount()==2){
+                    group.getChildren().remove(edge.control1);
+                    group.getChildren().remove(edge.control2);
+                    group.getChildren().remove(edge);
+                    graph.remove(edge);
+                }
+            });
 
+        }
     }
     public void addNode(int centerX, int centerY) {
         for(Node n: graph.getNodes()) {
@@ -185,17 +269,33 @@ public class Main extends Application {
         graph.add(node);
 
         node.setOnMouseClicked(e -> {
-            if(addingNodeProperty.get()) return;
+            if(e.getClickCount()==1) {
+                if (addingNodeProperty.get()) return;
 //            if(selectedNode != null) {
 //                selectedNode.setStroke(Node.normalColor); //TODO: set focus?
 //            }
-            selectedNode = node;
-            //node.setStroke(Node.focusedColor);
+                selectedNode = node;
+                //node.setStroke(Node.focusedColor);
+            }
+            else if(e.getClickCount()==2) {
+                group.getChildren().remove(node);
+                ArrayList<BezierEdge> adjacentEdges = (ArrayList<BezierEdge>) graph.getAllAdjacentEdges(node);
+                for(BezierEdge edge : adjacentEdges) {
+                    group.getChildren().remove(edge.control1);
+                    group.getChildren().remove(edge.control2);
+                    group.getChildren().remove(edge);
+                    graph.remove(edge);
+                }
+                graph.remove(node);
+            }
         });
         node.setOnMousePressed(e -> {
             if(e.getButton().equals(MouseButton.SECONDARY)) {
-                tempEdge = new Edge(node, node.getCenterX(), node.getCenterY(), graph);
-                group.getChildren().add(tempEdge);
+                tempEdge = new BezierEdge(node, node.getCenterX(), node.getCenterY(), graph);
+                //group.getChildren().add(tempEdge);
+            }
+            if(e.getButton().equals(MouseButton.PRIMARY)) {
+                tempPoint = new Point2D(node.getCenterX(), node.getCenterY());
             }
         });
         node.setOnMouseReleased(e -> {
@@ -212,15 +312,16 @@ public class Main extends Application {
                 }
 
                 if(minDistance < threshold && closestNode != null && closestNode != node) {
-                    Edge edge = new Edge(node, closestNode, graph);
-                    if(graph.getEdges().contains(edge)) {
-                        graph.getEdges().remove(edge);
-                        group.getChildren().remove(edge);
-                    }
-                    else {
-                        group.getChildren().add(edge);
-                        graph.add(edge);
-                    }
+//                    BezierEdge edge = new BezierEdge(node, closestNode, graph);
+//                    if(graph.getEdges().contains(edge)) {
+//                        graph.getEdges().remove(edge);
+//                        group.getChildren().remove(edge);
+//                    }
+//                    else {
+//                        group.getChildren().add(edge);
+//                        graph.add(edge);
+//                    }
+                    addEdge(node, closestNode);
                 }
                 group.getChildren().remove(tempEdge);
                 tempEdge = null;
@@ -230,27 +331,57 @@ public class Main extends Application {
             if(e.getButton().equals(MouseButton.PRIMARY)) {
                 node.setCenterX(e.getX());
                 node.setCenterY(e.getY());
-                //List<Edge> incomingEdges = graph.getIncomingEdges(node);
-                //for(Edge e: incomingEdges) incomingEdges.
+
+                Point2D currentPos = new Point2D(e.getX(), e.getY());
+
+                ArrayList<BezierEdge> neighboringEdges = (ArrayList<BezierEdge>) graph.getAllAdjacentEdges(node);
+                for(BezierEdge edge: neighboringEdges) {
+                    Node pivotNode = edge.getStartingNode().equals(node)? edge.getEndingNode() : edge.getStartingNode();
+                    Point2D pivot = new Point2D(pivotNode.getCenterX(), pivotNode.getCenterY());
+
+                    Point2D transform = getTransformation(tempPoint.subtract(pivot), currentPos.subtract(pivot));
+
+                    Point2D c1 = new Point2D(edge.control1.getCenterX(), edge.control1.getCenterY());
+                    Point2D c2 = new Point2D(edge.control2.getCenterX(), edge.control2.getCenterY());
+                    Point2D newC1 = applyTransformation(c1.subtract(pivot), transform).add(pivot);
+                    Point2D newC2 = applyTransformation(c2.subtract(pivot), transform).add(pivot);
+                    edge.control1.setCenterX(newC1.getX());
+                    edge.control1.setCenterY(newC1.getY());
+                    edge.control2.setCenterX(newC2.getX());
+                    edge.control2.setCenterY(newC2.getY());
+
+                }
+                tempPoint = currentPos;
+
             }
         });
         group.getChildren().add(node);
+    }
+    public Point2D getTransformation(Point2D p1, Point2D p2) {
+        double x = (p1.getX()*p2.getX()+p1.getY()*p2.getY())/(p1.getX()*p1.getX()+p1.getY()*p1.getY());
+        double y = (p1.getX()*p2.getY()-p1.getY()*p2.getX())/(p1.getX()*p1.getX()+p1.getY()*p1.getY());
+        return new Point2D(x,y);
+    }
+    public Point2D applyTransformation(Point2D p, Point2D transform) {
+        double x = p.getX()*transform.getX()-p.getY()*transform.getY();
+        double y = p.getX()*transform.getY()+p.getY()*transform.getX();
+        return new Point2D(x,y);
     }
     public void showEditEdgeShapeDialog() {
         Dialog<Object[]> dialog = new Dialog<>();
         dialog.setTitle("Edit Edges");
         dialog.setHeaderText("Edit the parameters of all edges");
 
-        dialog.getDialogPane().getButtonTypes().addAll(ButtonType.CANCEL, ButtonType.APPLY);
+        dialog.getDialogPane().getButtonTypes().addAll(ButtonType.APPLY, ButtonType.CANCEL);
         GridPane grid = new GridPane();
         grid.setHgap(10);
         grid.setVgap(10);
         grid.setPadding(new Insets(20, 150, 10, 10));
 
         TextField strokeWidthField = new TextField();
-        strokeWidthField.setText(String.format("%.1f", Edge.getWidth()));
+        strokeWidthField.setText(String.format("%.1f", BezierEdge.getWidth()));
         TextField strokeField = new TextField();
-        strokeField.setText(formatColorString(Edge.getStrokeColor()));
+        strokeField.setText(formatColorString(BezierEdge.getStrokeColor()));
 
         grid.add(new Label("Edit stroke width:"), 0, 0);
         grid.add(strokeWidthField, 1, 0);
@@ -264,7 +395,7 @@ public class Main extends Application {
             {bind(strokeField.textProperty(), strokeWidthField.textProperty());}
             @Override
             protected boolean computeValue() {
-                return !testDouble(strokeWidthField.getText()) && !testColor(strokeField.getText());
+                return !testDouble(strokeWidthField.getText()) || !testColor(strokeField.getText());
             }
         });
 
@@ -282,8 +413,8 @@ public class Main extends Application {
         Optional<Object[]> result = dialog.showAndWait();
         if(result.isPresent()) {
             Object[] parameters = result.get();
-            Edge.setWidth((double) parameters[0]);
-            Edge.setStrokeColor((Color) parameters[1]);
+            BezierEdge.setWidth((double) parameters[0]);
+            BezierEdge.setStrokeColor((Color) parameters[1]);
         }
     }
     public void showEditNodeShapeDialog() {
@@ -326,7 +457,7 @@ public class Main extends Application {
             {bind(radiusField.textProperty(), strokeWidthField.textProperty(), colorField.textProperty(), strokeField.textProperty());}
             @Override
             protected boolean computeValue() {
-                return !testInt(radiusField.getText()) && !testDouble(strokeWidthField.getText()) && !testColor(colorField.getText()) && !testColor(strokeField.getText());
+                return !testInt(radiusField.getText()) || !testDouble(strokeWidthField.getText()) || !testColor(colorField.getText()) || !testColor(strokeField.getText());
             }
         });
 

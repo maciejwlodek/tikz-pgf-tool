@@ -233,5 +233,4 @@ public class Arrow extends Group {
     public static ObjectProperty<Color> strokeColorProperty() {
         return strokeColorProperty;
     }
-
 }
