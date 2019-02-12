@@ -215,4 +215,9 @@ public class Graph {
         }
         return Optional.of(new Pair<>(closestEdge, minDist));
     }
+
+    public void clear() {
+        nodes.clear();
+        edges.clear();
+    }
 }

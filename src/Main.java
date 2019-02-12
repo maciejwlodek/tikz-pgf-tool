@@ -18,6 +18,7 @@ import javafx.scene.input.MouseButton;
 import javafx.scene.layout.*;
 import javafx.scene.paint.Color;
 import javafx.scene.shape.Circle;
+import javafx.scene.shape.Line;
 import javafx.scene.text.Text;
 import javafx.stage.Stage;
 import javafx.util.Pair;
@@ -35,15 +36,17 @@ public class Main extends Application {
     TODO: Implement directed vs undirected
     TODO: Allow editing of labels and label positions
     TODO: Allow editing of node shapes (circle, rectangle, etc).
-    TODO: Snap to grid option
      */
 
 
     Group group;
+    Group grid = new Group();
     Button addNodeButton;
     Button generateLatexButton;
     Button editNodeShapeButton;
     Button editEdgeShapeButton;
+    Button clearButton;
+    CheckBox gridCheckBox;
     BooleanProperty addingNodeProperty = new SimpleBooleanProperty(false);
     double threshold = 50;
     double edgeThreshold = 30;
@@ -54,10 +57,20 @@ public class Main extends Application {
     //Text helpText = new Text("Press the Add Node \n button to add vertices \n to the graph. \n Right click to \n finish adding nodes. \n Left click drag \n a node to move \n it around, and \n right click drag \n from one node \n to another to create \n an edge between them.");
     Button helpButton = new Button("Help");
 
+    TextField gridSepField;// = new TextField();
+
     Graph graph = new Graph();
     BezierEdge tempEdge;
 
     Point2D tempPoint = new Point2D(-1,-1);
+
+    int gridSepX = 30;
+    int gridSepY = 30;
+
+    Point2D mouseDragStartPosition;
+    Point2D translateStartPosition;
+
+    BooleanProperty gridShownProperty = new SimpleBooleanProperty(false);
 
 //    include in preamble:
 //    \\usepackage{tikz}
@@ -98,7 +111,30 @@ public class Main extends Application {
             showEditEdgeShapeDialog();
         });
 
+        clearButton = new Button("Clear graph");
+        clearButton.setOnAction(e -> {
+            graph.clear();
+            group.getChildren().clear();
+            group.getChildren().add(followingNode);
+        });
+        clearButton.disableProperty().bind(Bindings.size(graph.getNodes()).greaterThan(0).not());
 
+        gridCheckBox = new CheckBox("Show grid lines");
+        gridCheckBox.setSelected(false);
+
+        gridShownProperty.bind(gridCheckBox.selectedProperty());
+
+        gridSepField = new TextField();
+        gridSepField.setPromptText("Grid separation");
+        gridSepField.disableProperty().bind(gridCheckBox.selectedProperty().not());
+        gridSepField.textProperty().addListener((e,o,n) -> {
+            boolean testInteger = testGridSep(n);
+            if(testInteger) {
+                gridSepX = Integer.parseInt(n);
+                gridSepY = gridSepX;
+                setGridLines(gridSepX, gridSepY);
+            }
+        });
 
         generateLatexButton = new Button("Generate LaTeX");
         generateLatexButton.disableProperty().bind(Bindings.size(graph.getNodes()).greaterThan(0).not());
@@ -128,7 +164,7 @@ public class Main extends Application {
             alert.showAndWait();
             //System.out.println("Press the Add Node button to add vertices to the graph. Right click to finish adding nodes. \nLeft click drag a node to move it around, and right click drag from one node to another to create an edge between them. \nOnce your graph is finished, press the Generate Latex button to copy the tikz code into your clipboard.");
         });
-        toolbar.getChildren().addAll(addNodeButton, editNodeShapeButton, editEdgeShapeButton, generateLatexButton, helpButton, text);
+        toolbar.getChildren().addAll(addNodeButton, editNodeShapeButton, editEdgeShapeButton, clearButton, generateLatexButton, helpButton, gridCheckBox, gridSepField, text);
 
         Pane pane = new Pane();
         pane.setBackground(new Background(new BackgroundFill(Color.WHITE, CornerRadii.EMPTY, Insets.EMPTY)));
@@ -136,23 +172,44 @@ public class Main extends Application {
         borderPane.setCenter(pane);
         borderPane.setRight(toolbar);
 
+        //setGridLines(gridSepX, gridSepY);
+
 
         pane.getChildren().add(group);
+        //pane.getChildren().add(grid);
         group.getChildren().add(followingNode);
         group.setCursor(Cursor.HAND);
 
+        gridCheckBox.selectedProperty().addListener((observable, oldValue, newValue) -> {
+            if(newValue) {
+                setGridLines(gridSepX, gridSepY);
+                pane.getChildren().add(grid);
+            }
+            else {
+                pane.getChildren().remove(grid);
+            }
+        });
+
         pane.setOnMouseMoved(e -> {
-            followingNode.setCenterX(e.getX());
-            followingNode.setCenterY(e.getY());
+            //int centerX = gridSepX * ((int) (e.getX()/gridSepX + 0.5));
+            //int centerY = gridSepY * ((int) (e.getY()/gridSepY + 0.5));
+            followingNode.setCenterX(computeX(e.getX()));
+            followingNode.setCenterY(computeY(e.getY()));
+            //followingNode.setCenterX(e.getX());
+            //followingNode.setCenterY(e.getY());
             String s = String.format("x = %3.0f, y = %3.0f", e.getX(), e.getY());
             text.setText(s);
         });
         pane.setOnMousePressed(e -> {
+            mouseDragStartPosition = new Point2D(e.getX(), e.getY());
+            translateStartPosition = new Point2D(group.getTranslateX(), group.getTranslateY());
             if(e.getButton().equals(MouseButton.PRIMARY)) {
                 if(addingNodeProperty.get()) {
-                    int centerX = (int) e.getX();
-                    int centerY = (int) e.getY();
-                    addNode(centerX, centerY);
+                    //int centerX = gridSepX * ((int) (e.getX()/gridSepX + 0.5));
+                    //int centerY = gridSepY * ((int) (e.getY()/gridSepY + 0.5));
+                    //int centerX = (int) e.getX();
+                    //int centerY = (int) e.getY();
+                    addNode(computeX(e.getX()), computeY(e.getY()));
                 }
                 else {
                     Point2D clickPoint = new Point2D(e.getX(), e.getY());
@@ -199,6 +256,10 @@ public class Main extends Application {
             }
 
         });
+        pane.setOnMouseReleased(e -> {
+           mouseDragStartPosition = null;
+           translateStartPosition = null;
+        });
 //        pane.setOnMouseReleased(e -> {
 //            if(e.getButton().equals(MouseButton.SECONDARY)) {
 //                group.getChildren().remove(tempEdge);
@@ -206,6 +267,12 @@ public class Main extends Application {
 //            }
 //        });
         pane.setOnMouseDragged(e -> {
+//            if(!group.contains(mouseDragStartPosition) && e.getButton().equals(MouseButton.PRIMARY)) {
+//                double dx = e.getX() - mouseDragStartPosition.getX();
+//                double dy = e.getY() - mouseDragStartPosition.getY();
+//                group.setTranslateX(translateStartPosition.getX() + dx);
+//                group.setTranslateY(translateStartPosition.getY() + dy);
+//            }
             if(e.getButton().equals(MouseButton.SECONDARY) && tempEdge != null) {
                 tempEdge.setEndX(e.getX());
                 tempEdge.setEndY(e.getY());
@@ -329,10 +396,10 @@ public class Main extends Application {
         });
         node.setOnMouseDragged(e -> {
             if(e.getButton().equals(MouseButton.PRIMARY)) {
-                node.setCenterX(e.getX());
-                node.setCenterY(e.getY());
+                node.setCenterX(computeX(e.getX()));
+                node.setCenterY(computeY(e.getY()));
 
-                Point2D currentPos = new Point2D(e.getX(), e.getY());
+                Point2D currentPos = new Point2D(computeX(e.getX()), computeY(e.getY()));
 
                 ArrayList<BezierEdge> neighboringEdges = (ArrayList<BezierEdge>) graph.getAllAdjacentEdges(node);
                 for(BezierEdge edge: neighboringEdges) {
@@ -483,11 +550,25 @@ public class Main extends Application {
         if(result.isPresent()) {
             Object[] parameters = result.get();
             Node.setNodeRadius((int) parameters[0]);
+//            if(Node.getNodeRadius() > gridSepX) {
+//                gridSepX = Node.getNodeRadius();
+//                gridSepY = Node
+//            }
             Node.setWidth((double) parameters[1]);
             Node.setFillColor((Color) parameters[2]);
             Node.setStrokeColor((Color) parameters[3]);
         }
 
+    }
+    public boolean testGridSep(String s) {
+        try {
+            int x = Integer.parseInt(s);
+            //if(x >= 2 * Node.getNodeRadius()) return true;
+            if(x >= 5) return true;
+            return false;
+        } catch (NumberFormatException e) {
+            return false;
+        }
     }
     public boolean testInt(String s) {
         try {
@@ -536,5 +617,29 @@ public class Main extends Application {
 //        Arrow.setCutoff(cutoff);
 //    }
 
+
+    public int computeX(double x) {
+        return gridShownProperty.get()? gridSepX * ((int) (x/gridSepX + 0.5)) : (int) x;
+    }
+    public int computeY(double y) {
+        return gridShownProperty.get()? gridSepY * ((int) (y/gridSepY + 0.5)) : (int) y;
+    }
+
+    public void setGridLines(int gridSepX, int gridSepY) {
+        grid.getChildren().clear();
+        for(int i = 0; i<4000; i+=gridSepX) {
+            Line l = new Line(i, 0, i, 2500);
+            l.setStrokeWidth(0.3);
+            grid.getChildren().add(l);
+            l.toBack();
+        }
+        for(int i = 0; i<2500; i+=gridSepY) {
+            Line l = new Line(0, i, 4000, i);
+            l.setStrokeWidth(0.3);
+            grid.getChildren().add(l);
+            l.toBack();
+        }
+        //grid.toBack();
+    }
 
 }
