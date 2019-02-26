@@ -1,5 +1,4 @@
-import javafx.beans.property.DoubleProperty;
-import javafx.beans.property.SimpleDoubleProperty;
+package fx;
 
 import java.util.Objects;
 

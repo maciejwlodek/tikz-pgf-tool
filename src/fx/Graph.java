@@ -1,8 +1,10 @@
+package fx;
+
 import javafx.collections.FXCollections;
+import javafx.collections.ListChangeListener;
 import javafx.collections.ObservableList;
 import javafx.geometry.Point2D;
 import javafx.scene.paint.Color;
-import javafx.scene.shape.CubicCurve;
 import javafx.util.Pair;
 
 import java.util.List;
@@ -11,59 +13,45 @@ import java.util.stream.Collectors;
 
 public class Graph {
 
-//    ArrayList<Node> nodes;
-//    ArrayList<Edge> edges;
-    ObservableList<Node> nodes;
+    ObservableList<LabeledNode> nodes;
     ObservableList<BezierEdge> edges;
 
     public Graph() {
-//        nodes = new ArrayList<>();
-//        edges = new ArrayList<>();
         nodes = FXCollections.observableArrayList();
         edges = FXCollections.observableArrayList();
-    }
-//    public Graph(ArrayList<Node> nodes, ArrayList<Edge> edges) {
-//        this.nodes=nodes;
-//        this.edges=edges;
-//    }
 
-    public void add(Node node){
+    }
+
+    public void add(LabeledNode node){
         nodes.add(node);
     }
     public void add(BezierEdge edge) {
         edges.add(edge);
     }
-    public void remove(Node node){
+    public void remove(LabeledNode node){
         nodes.remove(node);
     }
     public void remove(BezierEdge edge) {
         edges.remove(edge);
     }
-//    public ArrayList<Node> getNodes() {
-//        return nodes;
-//    }
-//    public ArrayList<Edge> getEdges() {
-//        return edges;
-//    }
 
-    public ObservableList<Node> getNodes() {
+    public ObservableList<LabeledNode> getNodes() {
         return nodes;
     }
-
     public ObservableList<BezierEdge> getEdges() {
         return edges;
     }
 
 
-    public List<BezierEdge> getAllAdjacentEdges(Node node) {
+    public List<BezierEdge> getAllAdjacentEdges(LabeledNode node) {
         List<BezierEdge> neighbors =  getIncomingEdges(node);
         neighbors.addAll(getOutgoingEdges(node));
         return neighbors;
     }
-    public List<BezierEdge> getOutgoingEdges(Node node) {
+    public List<BezierEdge> getOutgoingEdges(LabeledNode node) {
         return edges.stream().filter(e -> e.getStartingNode().equals(node)).collect(Collectors.toList());
     }
-    public List<BezierEdge> getIncomingEdges(Node node) {
+    public List<BezierEdge> getIncomingEdges(LabeledNode node) {
         return edges.stream().filter(e -> e.getEndingNode().equals(node)).collect(Collectors.toList());
     }
 
@@ -76,7 +64,7 @@ public class Graph {
         int fillOpacity = (int) (100*fillColor.getOpacity());
         int strokeOpacity = (int) (100*strokeColor.getOpacity());
         int edgeOpacity = (int) (100*edgeStrokeColor.getOpacity());
-        String fillColorDefString = String.format("\\definecolor{nodecolor}{rgb}{%.1f,%.1f,%.1f} \n", fillColor.getRed(), fillColor.getGreen(), fillColor.getBlue());
+        String fillColorDefString = String.format("\\definecolor{nodecolor}{rgb}{%.1f,%.1f,%.1f} \n", fillColor.getRed(), fillColor.getGreen(), fillColor.getBlue()); //TODO: not needed for independent node colors
         String strokeColorDefString = String.format("\\definecolor{strokecolor}{rgb}{%.1f,%.1f,%.1f} \n", strokeColor.getRed(), strokeColor.getGreen(), strokeColor.getBlue());
         String edgeStrokeColorDefString = String.format("\\definecolor{edgestrokecolor}{rgb}{%.1f,%.1f,%.1f} \n", edgeStrokeColor.getRed(), edgeStrokeColor.getGreen(), edgeStrokeColor.getBlue());
 
@@ -84,17 +72,23 @@ public class Graph {
         double strokeWidth = Node.getWidth()/2;
         double edgeStrokeWidth = BezierEdge.getWidth()/2;
         String shape = "circle"; //TODO: make editable
-        boolean directed = true; //TODO: make editable
+        boolean directed = BezierArrow.isDirected();
         String arrowType = directed? "->" : "-";
         String tikzSets = String.format("\\tikzset{vertex/.style = {shape=%s, fill=nodecolor!%d, inner sep=0pt, draw=strokecolor!%d, line width=%.1fpt, minimum size=%dpt}}\n" +
                 "\\tikzset{edge/.style = {line width=%.1fpt, draw=edgestrokecolor!%d, %s,> = latex'}}\n", shape, fillOpacity, strokeOpacity, strokeWidth, nodeSize, edgeStrokeWidth, edgeOpacity, arrowType);
-        StringBuilder labelsBuilder = new StringBuilder(" \\def\\labels{{\"\", ");
+        //String tikzSets = String.format("\\tikzset{vertex/.style = {shape=%s, inner sep=0pt, draw=strokecolor!%d, line width=%.1fpt, minimum size=%dpt}}\n" +
+        //        "\\tikzset{edge/.style = {line width=%.1fpt, draw=edgestrokecolor!%d, %s,> = latex'}}\n", shape, strokeOpacity, strokeWidth, nodeSize, edgeStrokeWidth, edgeOpacity, arrowType); //TODO: this is correct for independent node colors
+
+        StringBuilder labelsBuilder = new StringBuilder("\\def\\labels{{\"\", ");
         StringBuilder labelPositionsBuilder = new StringBuilder("\\def\\labelPositions{{, ");
         StringBuilder coordsBuilder = new StringBuilder("\\def\\coords{{{,}, ");
+        //StringBuilder colorsBuilder = new StringBuilder("\\def\\colors{{{,,}, ");
+        //StringBuilder opacitiesBuilder = new StringBuilder("\\def\\opacities{{, ");
         for(int i=0; i< nodes.size(); i++) {
-            String num = String.format("\"%d\" ", i+1);
-            labelsBuilder.append(num); //TODO: make labels editable
-            labelPositionsBuilder.append("90"); //TODO: make label positions editable
+            String label = nodes.get(i).getLabel();
+            labelsBuilder.append("\"" + label + "\"");
+            String labelAngle = String.format("%3.0f", nodes.get(i).getLabelAngle());
+            labelPositionsBuilder.append(labelAngle);
             double rescaledX = nodes.get(i).getRescaledX();
             double rescaledY = nodes.get(i).getRescaledY();
             String coordinatePair = String.format("{%.2f, %.2f}", rescaledX, rescaledY);
@@ -115,6 +109,27 @@ public class Graph {
         String coords = coordsBuilder.toString();
 
         String numNodes = String.format("\\def\\numNodes{%d};\n", nodes.size());
+
+        if(edges.size()==0) {
+            String macros = "\\def\\getLabelAngle#1{\\pgfmathtruncatemacro{\\angle}{\\labelPositions[#1]}};\n";
+            String closing = "   %DRAW THE NODES WITH LABELS\n" +
+                    "   \\foreach \\phi in {1,...,\\numNodes}{\n" +
+                    "      \\getLabelAngle{\\phi};\n" +
+                    "      \\node[vertex, label={\\angle:\\pgfmathparse{\\labels[\\phi]}\\pgfmathresult}] (\\phi) at (\\coords[\\phi][0], \\coords[\\phi][1]) {};\n" +
+                    "   }\n" +
+                    "\\end{tikzpicture}\n";
+            return header+
+                    fillColorDefString+
+                    strokeColorDefString+
+                    tikzSets+
+                    labels+
+                    labelPositions+
+                    numNodes+
+                    coords+
+                    macros+
+                    closing;
+        }
+
         String numEdges = String.format("\\def\\numEdges{%d};\n", edges.size());
 
         StringBuilder edgesBuilder = new StringBuilder("\\def\\edges{{{,}, ");
@@ -152,9 +167,13 @@ public class Graph {
 //                "  \\def\\getCYA#1{\\pgfmathtruncatemacro{\\cya}{\\controls[#1][1]}};\n" +
 //                "  \\def\\getCXB#1{\\pgfmathtruncatemacro{\\cxb}{\\controls[#1][2]}};\n" +
 //                "  \\def\\getCYB#1{\\pgfmathtruncatemacro{\\cyb}{\\controls[#1][3]}};\n";
-        String macros = "  \\def\\getFirstNode#1{\\pgfmathtruncatemacro{\\nodeA}{\\edges[#1][0]}};\n" +
-                "  \\def\\getSecondNode#1{\\pgfmathtruncatemacro{\\nodeB}{\\edges[#1][1]}};\n" +
-                "  \\def\\getLabelAngle#1{\\pgfmathtruncatemacro{\\angle}{\\labelPositions[#1]}};\n";
+        String macros = "\\def\\getFirstNode#1{\\pgfmathtruncatemacro{\\nodeA}{\\edges[#1][0]}};\n" +
+                "\\def\\getSecondNode#1{\\pgfmathtruncatemacro{\\nodeB}{\\edges[#1][1]}};\n" +
+                "\\def\\getLabelAngle#1{\\pgfmathtruncatemacro{\\angle}{\\labelPositions[#1]}};\n";
+        //"\\def\\getR#1{\\pgfmathtruncatemacro{\\red}{\\colors[#1][0]}};\n" +
+        //        "\\def\\getG#1{\\pgfmathtruncatemacro{\\green}{\\colors[#1][1]}};\n" +
+        //        "\\def\\getB#1{\\pgfmathtruncatemacro{\\blue}{\\colors[#1][2]}};\n" +
+        //        "\\def\\getA#1{\\pgfmathtruncatemacro{\\opac}{\\opacities[#1]}};\n"; TODO: some more macros for independent node colors
 
         String closing = "   %DRAW THE NODES WITH LABELS\n" +
                 "   \\foreach \\phi in {1,...,\\numNodes}{\n" +
@@ -168,23 +187,23 @@ public class Graph {
                 "      \\draw[edge] (\\nodeA) .. controls (\\controls[\\psi][0], \\controls[\\psi][1]) and (\\controls[\\psi][2], \\controls[\\psi][3]) .. (\\nodeB);\n" +
                 "   }\n" +
                 "\\end{tikzpicture}\n";
-
 //        String closing = "   %DRAW THE NODES WITH LABELS\n" +
 //                "   \\foreach \\phi in {1,...,\\numNodes}{\n" +
 //                "      \\getLabelAngle{\\phi};\n" +
-//                "      \\node[vertex, label={\\angle:\\pgfmathparse{\\labels[\\phi]}\\pgfmathresult}] (\\phi) at (\\coords[\\phi][0], \\coords[\\phi][1]) {};\n" +
+//                "      \\getR{\\phi};\n" +
+//                "      \\getG{\\phi};\n" +
+//                "      \\getB{\\phi};\n" +
+//                "      \\getA{\\phi};\n" +
+//                "      \\definecolor{tempcolor}{rgb}{\\red, \\green, \\blue};\n" +
+//                "      \\node[vertex, fill=tempcolor!\\opac, label={\\angle:\\pgfmathparse{\\labels[\\phi]}\\pgfmathresult}] (\\phi) at (\\coords[\\phi][0], \\coords[\\phi][1]) {};\n" +
 //                "   }\n" +
 //                "   %DRAW THE EDGES\n" +
 //                "   \\foreach \\psi in {1,...,\\numEdges}{\n" +
 //                "      \\getFirstNode{\\psi};\n" +
 //                "      \\getSecondNode{\\psi};\n" +
-//                "      \\getCXA{\\psi};\n" +
-//                "      \\getCYA{\\psi};\n" +
-//                "      \\getCXB{\\psi};\n" +
-//                "      \\getCYB{\\psi};\n" +
-//                "      \\draw[edge] (\\nodeA) .. controls (\\cxa, \\cya) and (\\cxb, \\cyb) .. (\\nodeB);\n" +
+//                "      \\draw[edge] (\\nodeA) .. controls (\\controls[\\psi][0], \\controls[\\psi][1]) and (\\controls[\\psi][2], \\controls[\\psi][3]) .. (\\nodeB);\n" +
 //                "   }\n" +
-//                "\\end{tikzpicture}\n";
+//                "\\end{tikzpicture}\n"; //TODO: This is the corrected closing that accounts for independent node colors
 
         return header+
                 fillColorDefString+
@@ -214,6 +233,32 @@ public class Graph {
             }
         }
         return Optional.of(new Pair<>(closestEdge, minDist));
+    }
+
+    public Optional<Pair<LabeledNode, Double>> nearestNode(Point2D p) {
+        if(nodes.size()==0) return Optional.empty();
+        double minDist = Double.MAX_VALUE;
+        LabeledNode closestNode = nodes.get(0);
+        for(LabeledNode node: nodes) {
+            double d = p.distance(node.getCenterX(), node.getCenterY());
+            if(d < minDist) {
+                minDist = d;
+                closestNode = node;
+            }
+        }
+        return Optional.of(new Pair<>(closestNode, minDist));
+    }
+
+    public Optional<LabeledNode> getNodeContainingPoint(Point2D p) {
+        Optional<Pair<LabeledNode, Double>> nearestNode = nearestNode(p);
+        if(!nearestNode.isPresent()) return Optional.empty();
+        else {
+            Pair<LabeledNode, Double> node = nearestNode.get();
+            if(node.getValue() <= Node.getNodeRadius()) {
+                return Optional.of(node.getKey());
+            }
+            else return Optional.empty();
+        }
     }
 
     public void clear() {

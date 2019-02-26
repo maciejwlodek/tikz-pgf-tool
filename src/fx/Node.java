@@ -1,5 +1,6 @@
+package fx;
+
 import javafx.beans.property.*;
-import javafx.scene.input.MouseButton;
 import javafx.scene.paint.Color;
 import javafx.scene.shape.Circle;
 
@@ -7,12 +8,12 @@ public class Node extends Circle {
 
     Graph graph;
 
-    static IntegerProperty nodeRadiusProperty = new SimpleIntegerProperty(10);
-    static DoubleProperty widthProperty = new SimpleDoubleProperty(1.0);
-    static ObjectProperty<Color> strokeColorProperty = new SimpleObjectProperty<>(Color.BLACK);
-    static ObjectProperty<Color> fillColorProperty = new SimpleObjectProperty<>(Color.WHITE);
+    static IntegerProperty nodeRadiusProperty = new SimpleIntegerProperty(Defaults.DEFAULT_NODE_RADIUS);//TODO: non static
+    static DoubleProperty widthProperty = new SimpleDoubleProperty(Defaults.DEFAULT_NODE_WIDTH);//TODO: non static
+    static ObjectProperty<Color> strokeColorProperty = new SimpleObjectProperty<>(Defaults.DEFAULT_NODE_STROKE_COLOR);//TODO: non static
+    static ObjectProperty<Color> fillColorProperty = new SimpleObjectProperty<>(Defaults.DEFAULT_NODE_FILL_COLOR);//TODO: non static
 
-    public Node(int centerX, int centerY, Graph graph) {
+    public Node(double centerX, double centerY, Graph graph) {
         super(centerX, centerY, getNodeRadius());
         this.graph=graph;
 
@@ -33,6 +34,19 @@ public class Node extends Circle {
 //        });
 
     }
+
+    //-------------------
+    public Node(double centerX, double centerY) {
+        super(centerX, centerY, getNodeRadius());
+
+        this.fillProperty().bind(fillColorProperty);
+        this.strokeProperty().bind(strokeColorProperty);
+        this.radiusProperty().bind(nodeRadiusProperty);
+        this.strokeWidthProperty().bind(widthProperty);
+
+        toFront();
+    }
+    //------------------------------------
 
     public double getRescaledX() {
         double width = 620; //TODO: fix by binding to actual width

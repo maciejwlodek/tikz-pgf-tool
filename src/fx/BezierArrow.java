@@ -1,9 +1,9 @@
+package fx;
+
 import javafx.beans.InvalidationListener;
+import javafx.beans.binding.Bindings;
 import javafx.beans.binding.DoubleBinding;
-import javafx.beans.property.DoubleProperty;
-import javafx.beans.property.ObjectProperty;
-import javafx.beans.property.SimpleDoubleProperty;
-import javafx.beans.property.SimpleObjectProperty;
+import javafx.beans.property.*;
 import javafx.geometry.Point2D;
 import javafx.scene.Group;
 import javafx.scene.paint.Color;
@@ -20,10 +20,12 @@ public class BezierArrow extends Group {
     }
 
     private static final double arrowLength = 6;
-    private static final double arrowWidth = 3;
+    //private static final double arrowWidth = 3;
+    private static DoubleProperty arrowWidthProperty = new SimpleDoubleProperty();
+    public static BooleanProperty directedProperty = new SimpleBooleanProperty(Defaults.DEFAULT_DIRECTED);
     public static DoubleProperty cutoffProperty = new SimpleDoubleProperty();
-    public static DoubleProperty widthProperty = new SimpleDoubleProperty(1);
-    static ObjectProperty<Color> strokeColorProperty = new SimpleObjectProperty<>(Color.BLACK);
+    public static DoubleProperty widthProperty = new SimpleDoubleProperty(Defaults.DEFAULT_EDGE_WIDTH);
+    static ObjectProperty<Color> strokeColorProperty = new SimpleObjectProperty<>(Defaults.DEFAULT_EDGE_STROKE_COLOR);
 
     //public static double cutoff = 10;
 
@@ -52,6 +54,7 @@ public class BezierArrow extends Group {
         arrow2.strokeProperty().bind(strokeColorProperty);
 
 
+        arrowWidthProperty.bind(Bindings.when(directedProperty).then(3).otherwise(0));
 
 //        arrow1.rotationAxisProperty().bind(new ObjectBinding<Point3D>() {
 //            {bind(endXProperty(), endYProperty());}
@@ -157,6 +160,8 @@ public class BezierArrow extends Group {
 //                double factor = arrowLength / Math.hypot(sx-ex, sy-ey);
 //                double factorO = arrowWidth / Math.hypot(sx-ex, sy-ey);
 
+                double arrowWidth = arrowWidthProperty.get();
+
                 double factor = arrowLength / Math.hypot(cx2-ex, cy2-ey);
                 double factorO = arrowWidth / Math.hypot(cx2-ex, cy2-ey);
 
@@ -200,6 +205,7 @@ public class BezierArrow extends Group {
         controlX2Property().addListener(updater);
         controlY1Property().addListener(updater);
         controlY2Property().addListener(updater);
+        arrowWidthProperty.addListener(updater);
 
         cutoffProperty().addListener(updater);
         updater.invalidated(null);
@@ -347,11 +353,32 @@ public class BezierArrow extends Group {
         return strokeColorProperty;
     }
 
+//    private void setArrowWidth(double value) {
+//        arrowWidthProperty.set(value);
+//    }
+//    private double getArrowWidth() {
+//        return arrowWidthProperty.get();
+//    }
+//    private DoubleProperty arrowWidthProperty() {
+//        return arrowWidthProperty;
+//    }
+    public static void setDirected(boolean value) {
+        directedProperty.set(value);
+    }
+    public static boolean isDirected() {
+        return directedProperty.get();
+    }
+    public static BooleanProperty directedProperty() {
+        return directedProperty;
+    }
+
+
     private Point2D eval(double t){
-        Point2D p=new Point2D(Math.pow(1-t,3)*curve.getStartX()+
-                3*t*Math.pow(1-t,2)*curve.getControlX1()+
-                3*(1-t)*t*t*curve.getControlX2()+
-                Math.pow(t, 3)*curve.getEndX(),
+        Point2D p=new Point2D(
+                Math.pow(1-t,3)*curve.getStartX()+
+                        3*t*Math.pow(1-t,2)*curve.getControlX1()+
+                        3*(1-t)*t*t*curve.getControlX2()+
+                        Math.pow(t, 3)*curve.getEndX(),
                 Math.pow(1-t,3)*curve.getStartY()+
                         3*t*Math.pow(1-t, 2)*curve.getControlY1()+
                         3*(1-t)*t*t*curve.getControlY2()+

@@ -1,28 +1,21 @@
-import javafx.geometry.Point2D;
+package fx;
+
 import javafx.scene.input.MouseButton;
-import javafx.scene.shape.CubicCurve;
 
 import java.util.Objects;
 
 public class BezierEdge extends BezierArrow {
 
-    Node startingNode;
-    Node endingNode;
-    Graph graph;
+    LabeledNode startingNode;
+    LabeledNode endingNode;
 
     BezierControlNode control1;
     BezierControlNode control2;
 
-    public BezierEdge(Node startingNode, Node endingNode, Graph graph) {
+    public BezierEdge(LabeledNode startingNode, LabeledNode endingNode) {
         super();
         this.startingNode=startingNode;
         this.endingNode=endingNode;
-        this.graph=graph;
-
-//        setStartX(startingNode.getCenterX());
-//        setStartY(startingNode.getCenterY());
-//        setEndX(endingNode.getCenterX());
-//        setEndY(endingNode.getCenterY());
 
         toBack();
 
@@ -31,10 +24,6 @@ public class BezierEdge extends BezierArrow {
         endXProperty().bind(endingNode.centerXProperty());
         endYProperty().bind(endingNode.centerYProperty());
 
-//        int cx1 = (int) ((getEndX()-getStartX())/3 + getStartX());
-//        int cx2 = (int) (2*(getEndX()-getStartX())/3 + getStartX());
-//        int cy1 = (int) ((getEndY()-getStartY())/3 + getStartY());
-//        int cy2 = (int) (2*(getEndY()-getStartY())/3 + getStartY());
         int[] linearControls = computeLinearControls(getStartX(), getEndX(), getStartY(), getEndY());
         control1 = new BezierControlNode(linearControls[0], linearControls[1]);
         control2 = new BezierControlNode(linearControls[2], linearControls[3]);
@@ -44,8 +33,6 @@ public class BezierEdge extends BezierArrow {
                 control1.setCenterX(e.getX());
                 control1.setCenterY(e.getY());
                 this.toBack();
-                //List<Edge> incomingEdges = graph.getIncomingEdges(node);
-                //for(Edge e: incomingEdges) incomingEdges.
             }
         });
         control2.setOnMouseDragged(e -> {
@@ -53,8 +40,6 @@ public class BezierEdge extends BezierArrow {
                 control2.setCenterX(e.getX());
                 control2.setCenterY(e.getY());
                 this.toBack();
-                //List<Edge> incomingEdges = graph.getIncomingEdges(node);
-                //for(Edge e: incomingEdges) incomingEdges.
             }
         });
 
@@ -65,27 +50,28 @@ public class BezierEdge extends BezierArrow {
 
     }
 
-    //only for temporary edges before they are connected to an end node
-    public BezierEdge(Node startingNode, double endX, double endY, Graph graph) {
+    public BezierEdge(LabeledNode startingNode, LabeledNode endingNode, double cx1, double cy1, double cx2, double cy2) {
+        this(startingNode, endingNode);
+        control1.centerXProperty().set(cx1);
+        control1.centerYProperty().set(cy1);
+        control2.centerXProperty().set(cx2);
+        control2.centerYProperty().set(cy2);
+//        setControlX1(cx1);
+//        setControlX2(cx2);
+//        setControlY1(cy1);
+//        setControlY2(cy2);
+    }
+
+
+    public BezierEdge(LabeledNode startingNode, double endX, double endY) {
         super();
         this.startingNode = startingNode;
-        this.graph=graph;
 
         setStartX(startingNode.getCenterX());
         setStartY(startingNode.getCenterY());
         setEndX(endX);
         setEndY(endY);
     }
-
-    public BezierEdge(double startX, double startY, double endX, double endY, Graph graph) {
-        super();
-        setStartX(startX);
-        setStartY(startY);
-        setEndX(endX);
-        setEndY(endY);
-
-    }
-
     static int[] computeLinearControls(double startX, double endX, double startY, double endY) {
         int cx1 = (int) ((endX-startX)/3 + startX);
         int cx2 = (int) (2*(endX-startX)/3 + startX);
@@ -93,21 +79,30 @@ public class BezierEdge extends BezierArrow {
         int cy2 = (int) (2*(endY-startY)/3 + startY);
         return new int[] {cx1, cy1, cx2, cy2};
     }
-    
-    public Node getStartingNode() {
+
+    public LabeledNode getStartingNode() {
         return startingNode;
     }
-
-    public void setStartingNode(Node startingNode) {
+    public void setStartingNode(LabeledNode startingNode) {
         this.startingNode = startingNode;
     }
-
-    public Node getEndingNode() {
+    public LabeledNode getEndingNode() {
         return endingNode;
     }
-
-    public void setEndingNode(Node endingNode) {
+    public void setEndingNode(LabeledNode endingNode) {
         this.endingNode = endingNode;
+    }
+    public BezierControlNode getControl1() {
+        return control1;
+    }
+    public void setControl1(BezierControlNode control1) {
+        this.control1 = control1;
+    }
+    public BezierControlNode getControl2() {
+        return control2;
+    }
+    public void setControl2(BezierControlNode control2) {
+        this.control2 = control2;
     }
 
     @Override
@@ -117,18 +112,7 @@ public class BezierEdge extends BezierArrow {
         BezierEdge that = (BezierEdge) o;
         return Objects.equals(startingNode, that.startingNode) &&
                 Objects.equals(endingNode, that.endingNode) &&
-                Objects.equals(graph, that.graph) &&
                 Objects.equals(control1, that.control1) &&
                 Objects.equals(control2, that.control2);
     }
-
-    //    @Override
-//    public boolean equals(Object o) {
-//        if (this == o) return true;
-//        if (o == null || getClass() != o.getClass()) return false;
-//        Edge edge = (Edge) o;
-//        return Objects.equals(startingNode, edge.startingNode) &&
-//                Objects.equals(endingNode, edge.endingNode) &&
-//                Objects.equals(graph, edge.graph);
-//    }
 }
