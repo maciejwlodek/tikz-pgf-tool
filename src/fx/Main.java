@@ -29,7 +29,6 @@ import serializable.BezierEdgeSerializable;
 import serializable.GraphSerializable;
 import serializable.LabeledNodeSerializable;
 import serializable.OptionsSerializable;
-
 import java.awt.*;
 import java.awt.datatransfer.Clipboard;
 import java.awt.datatransfer.StringSelection;
@@ -45,7 +44,6 @@ public class Main extends Application {
     Summary of TODOS
     TODO: Clean up fx.LabeledNode and fx.Graph
     TODO: Integrate with djf and jtps
-    TODO: Clean up interface
     TODO: Rework mouselisteners to make more concise and modular.
     TODO: Independent colors for each node/edge (maybe automatically find chromatic number)
     TODO: Label distance needs to be editable
@@ -59,10 +57,8 @@ public class Main extends Application {
     Button saveAsButton;
     Button loadButton;
     Button helpButton = new Button("Help");
-
     CheckBox gridCheckBox;
     TextField gridSepField;
-
     CheckBox directedBox;
     Text text = new Text("");
 

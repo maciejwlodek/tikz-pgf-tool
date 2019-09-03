@@ -42,7 +42,7 @@ public class OptionsSerializable implements Serializable {
 //        this.gridSep = gridSep;
     }
     private double[] convertColor(Color c) {
-        return new double[] { c.getRed(), c.getBlue(), c.getGreen(), c.getOpacity()};
+        return new double[] { c.getRed(), c.getGreen(), c.getBlue(), c.getOpacity()};
     }
 
     public int getRadius() {

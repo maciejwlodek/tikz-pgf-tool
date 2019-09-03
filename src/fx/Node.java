@@ -50,12 +50,12 @@ public class Node extends Circle {
 
     public double getRescaledX() {
         double width = 620; //TODO: fix by binding to actual width
-        double targetRange = 5; //target range is [-5,5]
+        double targetRange =Defaults.SCALE_FACTOR*5; //target range is [-5,5]
         return (getCenterX() - width/2) * (2 * targetRange / width);
     }
     public double getRescaledY() {
         double height = 620; //TODO: fix by binding to actual width
-        double targetRange = 5; //target range is [-5,5]
+        double targetRange = Defaults.SCALE_FACTOR*5; //target range is [-5,5]
         return (height/2 - getCenterY()) * (2 * targetRange / height);
     }
 

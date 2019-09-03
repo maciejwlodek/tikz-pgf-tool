@@ -20,9 +20,13 @@ public class Defaults {
     public static final double DEFAULT_EDGE_WIDTH = 2;
     public static final Color DEFAULT_EDGE_STROKE_COLOR = Color.BLACK;
 
+    //directed or undirected
     public static final boolean DEFAULT_DIRECTED = true;
 
+    //show or hide grid + grid coarseness
     public static final boolean DEFAULT_GRID = true;
     public static final int DEFAULT_GRID_SEP = 25;
+
+    public static final double SCALE_FACTOR=1;
 
 }
